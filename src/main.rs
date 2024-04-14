@@ -2,7 +2,7 @@ use std::io::{self};
 
 // 定义关键字枚举类型
 #[derive(Debug, Clone)]
-enum Keyword {
+pub enum Keyword {
     Auto,
     Break,
     Case,
@@ -38,7 +38,7 @@ enum Keyword {
 }
 
 #[derive(Debug, Clone)]
-enum Operator {
+pub enum Operator {
     // Arithmetic Operators
     Add,      // +
     Subtract, // -
@@ -90,7 +90,7 @@ enum Operator {
 }
 
 #[derive(Debug, Clone)]
-enum Delimiter {
+pub enum Delimiter {
     //界符
     Semicolon,            // ;
     Comma,                // ,
@@ -106,13 +106,13 @@ enum Delimiter {
 }
 
 #[derive(Debug, Clone)]
-enum Number {
+pub enum Number {
     Integer(i64), // 整数类型，使用 i64 表示
     Float(f64),   // 浮点数类型，使用 f64 表示
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Token {
+pub enum Token {
     Keywords(Keyword),
     Identifiers(String),
     Numbers(Number),
