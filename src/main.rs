@@ -148,6 +148,7 @@ enum State {
 
 pub struct Lexer {
     state: State,
+    start_index: usize,
     index: usize,
     chars: Vec<char>,
     chars_len: usize,
@@ -157,10 +158,11 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(input: &str) -> Self {
         let mut chars: Vec<char> = input.chars().collect();
-        let chars_len: usize = chars.len();
         chars.push(' ');
+        let chars_len: usize = chars.len();
         Lexer {
             state: State::Start,
+            start_index: 0,
             index: 0,
             chars,
             chars_len,
@@ -211,12 +213,12 @@ impl Lexer {
     pub(crate) fn lex(&mut self) -> io::Result<(Vec<Token>, Vec<String>)> {
         // let mut next_index = 0;
         while self.index < self.chars_len {
-            self.index = self.process_char(self.index, self.index);
+            self.index = self.process_char(self.index);
         }
         Ok((self.tokens.clone(), self.errors.clone())) // 返回 tokens 和错误信息的元组
     }
 
-    fn process_char(&mut self, start_index: usize, ptr_index: usize) -> usize {
+    fn process_char(&mut self, ptr_index: usize) -> usize {
         // 在方法中使用 index 参数来获取当前字符的序号
         // let c = self.chars[index]; // 通过索引获取字符
         let mut next_index: usize = ptr_index + 1;
@@ -228,21 +230,25 @@ impl Lexer {
                     return next_index;
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
+                    self.start_index = ptr_index;
                     self.state = State::State1; // 匹配到字母或下划线-进入State1
-                    return self.process_char(start_index, start_index);
+                    return ptr_index;
                 }
                 '0'..='9' => {
+                    self.start_index = ptr_index;
                     self.state = State::State2; // 匹配到数字-进入State2
-                    return self.process_char(start_index, start_index);
+                    return ptr_index;
                 }
                 '+' | '-' | '*' | '/' | '%' | '=' | '!' | '<' | '>' | '&' | '|' | '^' | '~'
                 | '.' => {
+                    self.start_index = ptr_index;
                     self.state = State::State3; // 匹配到运算符-进入State3
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 ';' | ',' | '(' | ')' | '[' | ']' | '{' | '}' | '\'' | '"' | ':' | '?' => {
+                    self.start_index = ptr_index;
                     self.state = State::State4; // 匹配到界符-进入State4
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.errors.push(format!(
@@ -255,11 +261,11 @@ impl Lexer {
             State::State1 => match self.chars[ptr_index] {
                 'a'..='z' => {
                     self.state = State::State11;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 'A'..='Z' | '_' => {
                     self.state = State::State12;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.errors
@@ -271,16 +277,16 @@ impl Lexer {
             State::State11 => match self.chars[ptr_index] {
                 'a'..='z' => {
                     self.state = State::State11;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 'A'..='Z' | '_' | '0'..='9' => {
                     self.state = State::State12;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
-                    let identifier = &self.chars[start_index..ptr_index]; // 直接获取字符切片
+                    let identifier = &self.chars[self.start_index..ptr_index]; // 直接获取字符切片
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
-                    if ptr_index - start_index > 10 {
+                    if ptr_index - self.start_index > 10 {
                         self.tokens.push(Token::Identifiers(identifier_str));
                     } else {
                         if let Some(keyword) = self.get_keyword(&identifier_str) {
@@ -297,10 +303,10 @@ impl Lexer {
             State::State12 => match self.chars[ptr_index] {
                 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
                     self.state = State::State12;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
-                    let identifier = &self.chars[start_index..ptr_index]; // 直接获取字符切片
+                    let identifier = &self.chars[self.start_index..ptr_index]; // 直接获取字符切片
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
                     self.tokens.push(Token::Identifiers(identifier_str));
                     self.state = State::Start;
@@ -310,11 +316,11 @@ impl Lexer {
             State::State2 => match self.chars[ptr_index] {
                 '1'..='9' => {
                     self.state = State::State20; // State20开始匹配十进制整数/浮点数
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 '0' => {
                     self.state = State::State25; // State25尝试匹配多进制数
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.errors
@@ -327,24 +333,24 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '0'..='9' => {
                         self.state = State::State20;
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     '.' => {
                         self.state = State::State21; // State21不匹配.和e,匹配完第一个字符转为State21
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     'e' | 'E' => {
                         self.state = State::State23; // State23不匹配e和.但匹配-或正
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     _ => {
                         let mut number: i64 = 0;
-                        for &c in &self.chars[start_index..ptr_index] {
+                        for &c in &self.chars[self.start_index..ptr_index] {
                             if let Some(digit) = c.to_digit(10) {
                                 number = number * 10 + digit as i64;
                             }
                         }
-                        if self.chars[start_index] == '-' {
+                        if self.chars[self.start_index] == '-' {
                             number = 0- number;
                         }
                         self.tokens.push(Token::Numbers(Number::Integer(number)));
@@ -356,10 +362,10 @@ impl Lexer {
             State::State21 => match self.chars[ptr_index] {
                 '0'..='9' => {
                     self.state = State::State22;
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
-                    let error_number: String = self.chars[start_index..ptr_index].iter().collect();
+                    let error_number: String = self.chars[self.start_index..ptr_index].iter().collect();
                     self.errors.push(format!("Error number: {}", error_number));
                     self.state = State::Start;
                     return ptr_index;
@@ -369,15 +375,15 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '0'..='9' => {
                         self.state = State::State22;
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     'e' | 'E' => {
                         self.state = State::State23; // State23不匹配e和.
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     _ => {
                         let number_str: String =
-                            self.chars[start_index..ptr_index].iter().collect();
+                            self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
                         }
@@ -390,11 +396,11 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '0'..='9' | '-' | '+' => {
                         self.state = State::State24; // State23不匹配- +
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     _ => {
                         let error_number: String =
-                            self.chars[start_index..ptr_index].iter().collect();
+                            self.chars[self.start_index..ptr_index].iter().collect();
                         self.errors.push(format!("Error number: {}", error_number));
                         self.state = State::Start;
                         return ptr_index;
@@ -405,11 +411,11 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '0'..='9' => {
                         self.state = State::State24; // State24不匹配-
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     _ => {
                         let number_str: String =
-                            self.chars[start_index..ptr_index].iter().collect();
+                            self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
                         }
@@ -422,30 +428,30 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '.' => {
                         self.state = State::State21; // 0.x匹配十进制浮点数 State20不匹配.和e,匹配完第一个字符转为State21
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     'x' | 'X' => {
                         self.state = State::State26; // State26匹配16进制数
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     'b' | 'B' => {
                         self.state = State::State27; // State27匹配2进制数
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     '0'..='7' => {
                         self.state = State::State28; // State28匹配8进制数
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     'e' | 'E' => { 
                         self.state = State::State23; // 0e State23不匹配e和.但匹配-或正
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     '8' | '9' => { // 不存在的数字
                         if self.chars[next_index] >= '0' && self.chars[next_index] <= '9' {
                             next_index += 1;
                         }
                         let number_str: String =
-                            self.chars[start_index..next_index].iter().collect();
+                            self.chars[self.start_index..next_index].iter().collect();
                         self.state = State::Start;
                         self.errors
                             .push(format!("Error octal number: {}", number_str));
@@ -461,26 +467,26 @@ impl Lexer {
             State::State26 => match self.chars[ptr_index] { // 主要确定十六进制数字不能是0x后面不跟数字
                 '0'..='9' | 'a'..='f' | 'A'..='F' => {
                     self.state = State::State261; // State261继续处理16进制数
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.state = State::Start;
                     self.errors
-                        .push(format!("Error hexadecimal number in State26 in {}", start_index));
+                        .push(format!("Error hexadecimal number in State26 in {}", self.start_index));
                     return ptr_index;
                 }
             },
             State::State261 => match self.chars[ptr_index] {
                 '0'..='9' | 'a'..='f' | 'A'..='F' => {
                     self.state = State::State261; // State261继续处理16进制数
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.state = State::Start;
                     
-                    if self.chars[start_index] != '-'
+                    if self.chars[self.start_index] != '-'
                     {
-                        let number_str: String = self.chars[start_index..ptr_index].iter().collect();
+                        let number_str: String = self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = i64::from_str_radix(&number_str[2..], 16) {
                         self.tokens
                             .push(Token::Numbers(Number::Integer(number as i64)));
@@ -489,7 +495,7 @@ impl Lexer {
                             .push(format!("Error number: {} in State261", number_str));
                     }}
                     else {
-                        let number_str: String = self.chars[start_index+1..ptr_index].iter().collect();
+                        let number_str: String = self.chars[self.start_index+1..ptr_index].iter().collect();
                         if let Ok(number) = i64::from_str_radix(&number_str[2..], 16) {
                             let number_negetive = 0 - number;
                             self.tokens
@@ -507,7 +513,7 @@ impl Lexer {
                     while self.chars[next_index] == '0' || self.chars[next_index] == '1' { // 直接使用循环，避免递归次数过多堆栈溢出
                         next_index += 1;
                     }
-                    let number_str: String = self.chars[start_index..next_index].iter().collect();
+                    let number_str: String = self.chars[self.start_index..next_index].iter().collect();
                     if let Ok(number) = i64::from_str_radix(&number_str[2..], 2) {
                         self.tokens
                             .push(Token::Numbers(Number::Integer(number as i64)));
@@ -520,7 +526,7 @@ impl Lexer {
                 }
                 _ => {
                     self.state = State::Start;
-                    let number_str: String = self.chars[start_index..next_index].iter().collect();
+                    let number_str: String = self.chars[self.start_index..next_index].iter().collect();
                     self.errors
                         .push(format!("Error number: {} in State27", number_str));
                     return ptr_index;
@@ -529,26 +535,26 @@ impl Lexer {
             State::State28 => match self.chars[ptr_index] {
                 '0'..='7' => {
                     self.state = State::State28; // State28继续处理8进制数
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 '8' | '9' => {
                     self.state = State::State281; // 进入到8进制异常处理State281
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 '.' =>{ // 按照C语言标准，0开头但带小数点看作十进制浮点数
                     self.state = State::State21; // State20不匹配.和e,匹配完第一个字符转为State21
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 'e' | 'E' => { // 按照C语言标准，0开头但e看作十进制浮点数
                     self.state = State::State23; // State23不匹配e和.但匹配-或正
-                    return self.process_char(start_index, next_index);
+                    return next_index;
                 }
                 _ => {
                     self.state = State::Start;
-                    let number_str: String = self.chars[start_index..ptr_index].iter().collect();
+                    let number_str: String = self.chars[self.start_index..ptr_index].iter().collect();
                     // println!("{}", &number_str);
                     if let Ok(number) = i64::from_str_radix(&number_str[1..], 8) {
-                        if self.chars[start_index] == '-' {
+                        if self.chars[self.start_index] == '-' {
                         self.tokens
                             .push(Token::Numbers(Number::Integer(0-number as i64)));}
                         else {
@@ -566,11 +572,11 @@ impl Lexer {
                 match self.chars[ptr_index] {
                     '0'..='9' => {
                         self.state = State::State281; // State281继续收集错误数字
-                        return self.process_char(start_index, next_index);
+                        return next_index;
                     }
                     _ => {
                         self.state = State::Start;
-                    let number_str: String = self.chars[start_index..next_index].iter().collect();
+                    let number_str: String = self.chars[self.start_index..next_index].iter().collect();
                     self.errors
                         .push(format!("Invalid octal number: {} in State28", number_str));
                     return ptr_index;
@@ -581,7 +587,7 @@ impl Lexer {
 
             // }
             State::State3 => {
-                match self.chars[start_index] {
+                match self.chars[self.start_index] {
                     '+' => {
                         // 处理 '+' 的逻辑...
                         match self.chars[ptr_index] {
@@ -607,7 +613,7 @@ impl Lexer {
                                     return ptr_index;
                                 } else {
                                     self.state = State::State2; // State2匹配负数
-                                    return self.process_char(start_index, ptr_index);
+                                    return ptr_index;
                                 }
                             }
                             _ => {
@@ -648,7 +654,7 @@ impl Lexer {
                                     return ptr_index;
                                 } else {
                                     self.state = State::State2; // State2匹配负数
-                                    return self.process_char(start_index, ptr_index);
+                                    return ptr_index;
                                 }
                             }
                             _ => {
@@ -766,7 +772,7 @@ impl Lexer {
                             }
                             '<' => {
                                 self.state = State::State31; // State31可匹配<<=
-                                return self.process_char(start_index, next_index);
+                                return next_index;
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::LessThan));
@@ -786,7 +792,7 @@ impl Lexer {
                             }
                             '>' => {
                                 self.state = State::State32; // State32可匹配>>=
-                                return self.process_char(start_index, next_index);
+                                return next_index;
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::GreaterThan));
@@ -901,7 +907,7 @@ impl Lexer {
                 }
             },
             State::State4 => {
-                match self.chars[start_index] {
+                match self.chars[self.start_index] {
                     ';' => {
                         // 处理分号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::Semicolon));
@@ -963,11 +969,11 @@ impl Lexer {
                             next_index += 1;
                             if next_index == self.chars_len {
                                 self.errors.push(format!("Unmatched key: '"));
-                                return start_index + 1;
+                                return self.start_index + 1;
                             }
                         }
                         let str_slice: String =
-                            self.chars[start_index..=next_index].iter().collect();
+                            self.chars[self.start_index..=next_index].iter().collect();
                         self.tokens.push(Token::Strings(str_slice));
                         self.state = State::Start;
                         return next_index + 1;
@@ -978,11 +984,11 @@ impl Lexer {
                             next_index += 1;
                             if next_index == self.chars_len {
                                 self.errors.push(format!("Unmatched key: \""));
-                                return start_index + 1;
+                                return self.start_index + 1;
                             }
                         }
                         let str_slice: String =
-                            self.chars[start_index..=next_index].iter().collect();
+                            self.chars[self.start_index..=next_index].iter().collect();
                         self.tokens.push(Token::Strings(str_slice));
                         self.state = State::Start;
                         return next_index + 1;
