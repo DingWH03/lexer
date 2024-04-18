@@ -175,10 +175,10 @@ impl Lexer {
             index: 0,
             row: 1,
             col: 1,
-            chars,
-            chars_len,
-            tokens_location: Vec::new(),
-            tokens: Vec::new(),
+            chars, // 输入字符序列
+            chars_len, // 输入字符序列长度
+            tokens_location: Vec::new(), // 输出token所在位置
+            tokens: Vec::new(), // 输出token
             errors: Vec::new(), // 初始化错误向量
         }
     }
@@ -315,15 +315,15 @@ impl Lexer {
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
                     if ptr_index - self.start_index > 10 {
                         self.tokens.push(Token::Identifiers(identifier_str));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                     } else {
                         if let Some(keyword) = self.get_keyword(&identifier_str) {
                             // 如果 get_keyword 返回 Some，表示找到了关键字
                             self.tokens.push(Token::Keywords(keyword));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         } else {
                             self.tokens.push(Token::Identifiers(identifier_str));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         }
                     }
                     self.state = State::Start;
@@ -340,7 +340,7 @@ impl Lexer {
                     let identifier = &self.chars[self.start_index..ptr_index]; // 直接获取字符切片
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
                     self.tokens.push(Token::Identifiers(identifier_str));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                    self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                     self.state = State::Start;
                     return ptr_index;
                 }
@@ -391,7 +391,7 @@ impl Lexer {
                             number = 0 - number;
                         }
                         self.tokens.push(Token::Numbers(Number::Integer(number)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -428,7 +428,7 @@ impl Lexer {
                             self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         }
                         self.state = State::Start;
                         return ptr_index;
@@ -463,7 +463,7 @@ impl Lexer {
                             self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         }
                         self.state = State::Start;
                         return ptr_index;
@@ -514,7 +514,7 @@ impl Lexer {
                     _ => {
                         // 直接匹配数字整形0
                         self.tokens.push(Token::Numbers(Number::Integer(0)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -551,7 +551,7 @@ impl Lexer {
                         if let Ok(number) = i64::from_str_radix(&number_str[2..], 16) {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         } else {
                             self.errors
                                 .push(format!("Error number: {} in State261", number_str));
@@ -563,7 +563,7 @@ impl Lexer {
                             let number_negetive = 0 - number;
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number_negetive as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         } else {
                             self.errors
                                 .push(format!("Error number: {} in State261", number_str));
@@ -584,7 +584,7 @@ impl Lexer {
                     if let Ok(number) = i64::from_str_radix(&number_str[2..], 2) {
                         self.tokens
                             .push(Token::Numbers(Number::Integer(number as i64)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                     } else {
                         self.errors
                             .push(format!("Error number: {} in State27", number_str));
@@ -634,11 +634,11 @@ impl Lexer {
                         if self.chars[self.start_index] == '-' {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(0 - number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         } else {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
                         }
                     } else {
                         self.errors
