@@ -147,9 +147,12 @@ enum State {
     State281, //8进制异常处理
     // State29, // 非多个e或是小数点的错误处理
     State3, //开始->运算符
-    State31,
-    State32,
-    State4, //开始->界符
+    State31, // State31可匹配<<=
+    State32,// State32可匹配>>=
+    State33, //处理注释/* */
+    State4,  //开始->界符
+    State41, //匹配单引号
+    State42, //匹配双引号
 }
 
 pub struct Lexer {
@@ -175,11 +178,11 @@ impl Lexer {
             index: 0,
             row: 1,
             col: 1,
-            chars, // 输入字符序列
-            chars_len, // 输入字符序列长度
+            chars,                       // 输入字符序列
+            chars_len,                   // 输入字符序列长度
             tokens_location: Vec::new(), // 输出token所在位置
-            tokens: Vec::new(), // 输出token
-            errors: Vec::new(), // 初始化错误向量
+            tokens: Vec::new(),          // 输出token
+            errors: Vec::new(),          // 初始化错误向量
         }
     }
 
@@ -227,7 +230,11 @@ impl Lexer {
         while self.index < self.chars_len {
             self.index = self.process_char(self.index);
         }
-        Ok((self.tokens.clone(), self.tokens_location.clone(), self.errors.clone())) // 返回 tokens 和错误信息的元组
+        Ok((
+            self.tokens.clone(),
+            self.tokens_location.clone(),
+            self.errors.clone(),
+        )) // 返回 tokens 和错误信息的元组
     }
 
     fn process_char(&mut self, ptr_index: usize) -> usize {
@@ -315,15 +322,24 @@ impl Lexer {
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
                     if ptr_index - self.start_index > 10 {
                         self.tokens.push(Token::Identifiers(identifier_str));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.start_index + self.col - ptr_index,
+                        });
                     } else {
                         if let Some(keyword) = self.get_keyword(&identifier_str) {
                             // 如果 get_keyword 返回 Some，表示找到了关键字
                             self.tokens.push(Token::Keywords(keyword));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         } else {
                             self.tokens.push(Token::Identifiers(identifier_str));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         }
                     }
                     self.state = State::Start;
@@ -340,7 +356,10 @@ impl Lexer {
                     let identifier = &self.chars[self.start_index..ptr_index]; // 直接获取字符切片
                     let identifier_str: String = identifier.iter().collect(); // 将切片转换为字符串
                     self.tokens.push(Token::Identifiers(identifier_str));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                    self.tokens_location.push(TokenLocation {
+                        row: self.row,
+                        col: self.start_index + self.col - ptr_index,
+                    });
                     self.state = State::Start;
                     return ptr_index;
                 }
@@ -391,7 +410,10 @@ impl Lexer {
                             number = 0 - number;
                         }
                         self.tokens.push(Token::Numbers(Number::Integer(number)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.start_index + self.col - ptr_index,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -428,7 +450,10 @@ impl Lexer {
                             self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         }
                         self.state = State::Start;
                         return ptr_index;
@@ -463,7 +488,10 @@ impl Lexer {
                             self.chars[self.start_index..ptr_index].iter().collect();
                         if let Ok(number) = number_str.parse::<f64>() {
                             self.tokens.push(Token::Numbers(Number::Float(number)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         }
                         self.state = State::Start;
                         return ptr_index;
@@ -501,7 +529,7 @@ impl Lexer {
                         // 不存在的数字
                         while self.chars[next_index] >= '0' && self.chars[next_index] <= '9' {
                             next_index += 1;
-                            self.col+=1;
+                            self.col += 1;
                         }
                         let number_str: String =
                             self.chars[self.start_index..next_index].iter().collect();
@@ -514,7 +542,10 @@ impl Lexer {
                     _ => {
                         // 直接匹配数字整形0
                         self.tokens.push(Token::Numbers(Number::Integer(0)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.start_index + self.col - ptr_index,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -551,7 +582,10 @@ impl Lexer {
                         if let Ok(number) = i64::from_str_radix(&number_str[2..], 16) {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         } else {
                             self.errors
                                 .push(format!("Error number: {} in State261", number_str));
@@ -563,7 +597,10 @@ impl Lexer {
                             let number_negetive = 0 - number;
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number_negetive as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         } else {
                             self.errors
                                 .push(format!("Error number: {} in State261", number_str));
@@ -577,14 +614,17 @@ impl Lexer {
                     while self.chars[next_index] == '0' || self.chars[next_index] == '1' {
                         // 直接使用循环，避免递归次数过多堆栈溢出(现已将整个词法处理程序更改为循环)
                         next_index += 1;
-                        self.col+=1;
+                        self.col += 1;
                     }
                     let number_str: String =
                         self.chars[self.start_index..next_index].iter().collect();
                     if let Ok(number) = i64::from_str_radix(&number_str[2..], 2) {
                         self.tokens
                             .push(Token::Numbers(Number::Integer(number as i64)));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.start_index + self.col - ptr_index,
+                        });
                     } else {
                         self.errors
                             .push(format!("Error number: {} in State27", number_str));
@@ -634,11 +674,17 @@ impl Lexer {
                         if self.chars[self.start_index] == '-' {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(0 - number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         } else {
                             self.tokens
                                 .push(Token::Numbers(Number::Integer(number as i64)));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.start_index + self.col - ptr_index});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.start_index + self.col - ptr_index,
+                            });
                         }
                     } else {
                         self.errors
@@ -674,14 +720,20 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::AddAssign));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             }
                             '+' => {
                                 self.tokens.push(Token::Operators(Operator::Increment));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -694,7 +746,10 @@ impl Lexer {
                                         | Some(Token::Numbers(_))
                                 ) {
                                     self.tokens.push(Token::Operators(Operator::Add));
-                                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                    self.tokens_location.push(TokenLocation {
+                                        row: self.row,
+                                        col: self.col,
+                                    });
                                     self.state = State::Start;
                                     return ptr_index;
                                 } else {
@@ -704,7 +759,10 @@ impl Lexer {
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::Add));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -715,14 +773,20 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::SubtractAssign));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             }
                             '-' => {
                                 self.tokens.push(Token::Operators(Operator::Decrement));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -730,7 +794,10 @@ impl Lexer {
                             '>' => {
                                 self.tokens
                                     .push(Token::Operators(Operator::PointerMemberAccess));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -743,7 +810,10 @@ impl Lexer {
                                         | Some(Token::Numbers(_))
                                 ) {
                                     self.tokens.push(Token::Operators(Operator::Subtract));
-                                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                    self.tokens_location.push(TokenLocation {
+                                        row: self.row,
+                                        col: self.col,
+                                    });
                                     self.state = State::Start;
                                     return ptr_index;
                                 } else {
@@ -753,7 +823,10 @@ impl Lexer {
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::Subtract));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -764,7 +837,10 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::MultiplyAssign));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -777,12 +853,18 @@ impl Lexer {
                                         | Some(Token::Numbers(_))
                                 ) {
                                     self.tokens.push(Token::Operators(Operator::Multiply));
-                                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                    self.tokens_location.push(TokenLocation {
+                                        row: self.row,
+                                        col: self.col,
+                                    });
                                     self.state = State::Start;
                                     return ptr_index;
                                 } else {
                                     self.tokens.push(Token::Operators(Operator::Dereference));
-                                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                    self.tokens_location.push(TokenLocation {
+                                        row: self.row,
+                                        col: self.col,
+                                    });
                                     self.state = State::Start;
                                     return ptr_index;
                                 }
@@ -794,35 +876,35 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::DivideAssign));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             }
                             '/' => {
                                 while self.chars[next_index] != '\n' {
-                                    self.col+=1;
+                                    self.col += 1;
                                     next_index += 1;
                                 }
-                                self.row+=1;
+                                self.row += 1;
                                 self.state = State::Start;
                                 // self.col += 1;
                                 return next_index;
                             } // 处理注释
                             '*' => {
-                                while self.chars[next_index] != '*'
-                                    && self.chars[next_index + 1] != '/'
-                                {
-                                    next_index += 1;
-                                    self.col+=1;
-                                }
-                                self.state = State::Start;
+                                self.state = State::State33;
                                 self.col += 1;
                                 return next_index;
                             } // 处理注释
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::Divide));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -831,14 +913,20 @@ impl Lexer {
                     '%' => match self.chars[ptr_index] {
                         '=' => {
                             self.tokens.push(Token::Operators(Operator::ModulusAssign));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             self.col += 1;
                             return next_index;
                         }
                         _ => {
                             self.tokens.push(Token::Operators(Operator::Modulus));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             return ptr_index;
                         }
@@ -848,14 +936,20 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::Equal));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::Assign));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -866,14 +960,20 @@ impl Lexer {
                         match self.chars[ptr_index] {
                             '=' => {
                                 self.tokens.push(Token::Operators(Operator::NotEqual));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::LogicalNot));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -885,7 +985,10 @@ impl Lexer {
                             '=' => {
                                 self.tokens
                                     .push(Token::Operators(Operator::LessThanOrEqual));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -897,7 +1000,10 @@ impl Lexer {
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::LessThan));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -909,7 +1015,10 @@ impl Lexer {
                             '=' => {
                                 self.tokens
                                     .push(Token::Operators(Operator::GreaterThanOrEqual));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -921,7 +1030,10 @@ impl Lexer {
                             }
                             _ => {
                                 self.tokens.push(Token::Operators(Operator::GreaterThan));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 return ptr_index;
                             }
@@ -931,7 +1043,10 @@ impl Lexer {
                         '=' => {
                             self.tokens
                                 .push(Token::Operators(Operator::BitwiseAndAssign));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             self.col += 1;
                             return next_index;
@@ -944,13 +1059,19 @@ impl Lexer {
                                     | Some(Token::Strings(_))
                             ) {
                                 self.tokens.push(Token::Operators(Operator::LogicalAnd));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
                             } else {
                                 self.tokens.push(Token::Operators(Operator::AddressOf));
-                                self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                                self.tokens_location.push(TokenLocation {
+                                    row: self.row,
+                                    col: self.col,
+                                });
                                 self.state = State::Start;
                                 self.col += 1;
                                 return next_index;
@@ -958,7 +1079,10 @@ impl Lexer {
                         }
                         _ => {
                             self.tokens.push(Token::Operators(Operator::BitwiseAnd));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             return ptr_index;
                         }
@@ -967,21 +1091,30 @@ impl Lexer {
                         '=' => {
                             self.tokens
                                 .push(Token::Operators(Operator::BitwiseOrAssign));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             self.col += 1;
                             return next_index;
                         }
                         '|' => {
                             self.tokens.push(Token::Operators(Operator::LogicalOr));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             self.col += 1;
                             return next_index;
                         }
                         _ => {
                             self.tokens.push(Token::Operators(Operator::BitwiseOr));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             return ptr_index;
                         }
@@ -990,27 +1123,39 @@ impl Lexer {
                         '=' => {
                             self.tokens
                                 .push(Token::Operators(Operator::BitwiseXorAssign));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             self.col += 1;
                             return next_index;
                         }
                         _ => {
                             self.tokens.push(Token::Operators(Operator::BitwiseXor));
-                            self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                            self.tokens_location.push(TokenLocation {
+                                row: self.row,
+                                col: self.col,
+                            });
                             self.state = State::Start;
                             return ptr_index;
                         }
                     },
                     '.' => {
                         self.tokens.push(Token::Operators(Operator::MemberAccess));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '~' => {
                         self.tokens.push(Token::Operators(Operator::BitwiseNot));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -1028,14 +1173,20 @@ impl Lexer {
                 '=' => {
                     self.tokens
                         .push(Token::Operators(Operator::LeftShiftAssign));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                    self.tokens_location.push(TokenLocation {
+                        row: self.row,
+                        col: self.col,
+                    });
                     self.state = State::Start;
                     self.col += 1;
                     return next_index;
                 }
                 _ => {
                     self.tokens.push(Token::Operators(Operator::LeftShift));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                    self.tokens_location.push(TokenLocation {
+                        row: self.row,
+                        col: self.col,
+                    });
                     self.state = State::Start;
                     return ptr_index;
                 }
@@ -1044,31 +1195,68 @@ impl Lexer {
                 '=' => {
                     self.tokens
                         .push(Token::Operators(Operator::RightShiftAssign));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                    self.tokens_location.push(TokenLocation {
+                        row: self.row,
+                        col: self.col,
+                    });
                     self.state = State::Start;
                     self.col += 1;
                     return next_index;
                 }
                 _ => {
                     self.tokens.push(Token::Operators(Operator::RightShift));
-                    self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                    self.tokens_location.push(TokenLocation {
+                        row: self.row,
+                        col: self.col,
+                    });
                     self.state = State::Start;
                     return ptr_index;
                 }
             },
+            State::State33 => {
+                //处理/* */注释
+                match self.chars[ptr_index] {
+                    '*' => {
+                        match self.chars[next_index] {
+                            '/' => {
+                                self.state = State::Start;
+                                self.col += 2;
+                                return next_index+1;
+                            }
+                            _ => {
+                                self.state = State::State33;
+                                self.col += 1;
+                                return next_index;
+                            }
+                        }
+                    }
+                    
+                    _ => {
+                        self.state = State::State33;
+                                self.col += 1;
+                                return next_index;
+                    }
+                }
+            }
             State::State4 => {
                 match self.chars[self.start_index] {
                     ';' => {
                         // 处理分号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::Semicolon));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     ',' => {
                         // 处理逗号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::Comma));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -1076,7 +1264,10 @@ impl Lexer {
                         // 处理左括号的逻辑...
                         self.tokens
                             .push(Token::Delimiters(Delimiter::LeftParenthesis));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -1084,93 +1275,91 @@ impl Lexer {
                         // 处理右括号的逻辑...
                         self.tokens
                             .push(Token::Delimiters(Delimiter::RightParenthesis));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '[' => {
                         // 处理左方括号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::LeftBracket));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     ']' => {
                         // 处理右方括号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::RightBracket));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '{' => {
                         // 处理左大括号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::LeftBrace));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '}' => {
                         // 处理右大括号的逻辑...
                         self.tokens.push(Token::Delimiters(Delimiter::RightBrace));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '\\' => {
                         self.tokens.push(Token::Delimiters(Delimiter::Backslash));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '\'' => {
                         // 处理单引号的逻辑...
-                        while self.chars[next_index] != '\'' {
-                            next_index += 1;
-                            self.col+=1;
-                            if next_index == self.chars_len {
-                                self.errors.push(format!("Unmatched key: '"));
-                                self.col = self.index+1;
-                                return self.start_index + 1;
-                            }
-                        }
-                        let str_slice: String =
-                            self.chars[self.start_index..=next_index].iter().collect();
-                        self.tokens.push(Token::Strings(str_slice));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
-                        self.state = State::Start;
+                        self.state = State::State41;
                         self.col += 1;
-                        return next_index + 1;
+                        return next_index;
                     }
                     '"' => {
                         // 处理双引号的逻辑...
-                        while self.chars[next_index] != '"' {
-                            next_index += 1;
-                            self.col+=1;
-                            if next_index == self.chars_len {
-                                self.errors.push(format!("Unmatched key: \""));
-                                self.col = self.start_index + 1;
-                                return self.start_index + 1;
-                            }
-                        }
-                        let str_slice: String =
-                            self.chars[self.start_index..=next_index].iter().collect();
-                        self.tokens.push(Token::Strings(str_slice));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
-                        self.state = State::Start;
+                        self.state = State::State42;
                         self.col += 1;
-                        return next_index + 1;
+                        return next_index;
                     }
                     ':' => {
                         self.tokens
                             .push(Token::Delimiters(Delimiter::ConditionalSeparator));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
                     '?' => {
                         self.tokens
                             .push(Token::Delimiters(Delimiter::ConditionalOperator));
-                        self.tokens_location.push(TokenLocation{row: self.row, col: self.col});
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
                         self.state = State::Start;
                         return ptr_index;
                     }
@@ -1181,6 +1370,62 @@ impl Lexer {
                         ));
                         self.col += 1;
                         return next_index;
+                    }
+                }
+            }
+            State::State41 => {
+                //处理单引号
+                match self.chars[ptr_index] {
+                    '\'' => {
+                        let str_slice: String =
+                            self.chars[self.start_index..next_index].iter().collect();
+                        self.tokens.push(Token::Strings(str_slice));
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
+                        self.state = State::Start;
+                        self.col += 1;
+                        return next_index;
+                    }
+
+                    _ => {
+                        if next_index == self.chars_len {
+                            self.errors.push(format!("Unmatched key: '"));
+                            return self.chars_len;
+                        } else {
+                            self.state = State::State41;
+                            self.col += 1;
+                            return next_index;
+                        }
+                    }
+                }
+            }
+            State::State42 => {
+                //处理双引号
+                match self.chars[ptr_index] {
+                    '"' => {
+                        let str_slice: String =
+                            self.chars[self.start_index..next_index].iter().collect();
+                        self.tokens.push(Token::Strings(str_slice));
+                        self.tokens_location.push(TokenLocation {
+                            row: self.row,
+                            col: self.col,
+                        });
+                        self.state = State::Start;
+                        self.col += 1;
+                        return next_index;
+                    }
+                    
+                    _ => {
+                        if next_index == self.chars_len {
+                            self.errors.push(format!("Unmatched key: \""));
+                            return self.chars_len;
+                        } else {
+                            self.state = State::State42;
+                            self.col += 1;
+                            return next_index;
+                        }
                     }
                 }
             }
