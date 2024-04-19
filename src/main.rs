@@ -1446,12 +1446,14 @@ fn main() {
     let mut lexer = Lexer::new(&file_content);
     match lexer.lex() {
         Ok((tokens, tokens_location, errors)) => {
-            println!("Tokens: {:?}, location{:?}", tokens, tokens_location);
+            for (token, location) in tokens.iter().zip(tokens_location.iter()) {
+                println!("Tokens: {:?}, Location: {:?}", token, location);
+            }
             // 处理错误信息
             for err in errors {
                 eprintln!("Error: {}", err);
             }
-        }
+        }        
         Err(err) => eprintln!("Error: {}", err),
     }
 }
