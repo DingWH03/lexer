@@ -748,7 +748,7 @@ impl Lexer {
                                     self.tokens.push(Token::Operators(Operator::Add));
                                     self.tokens_location.push(TokenLocation {
                                         row: self.row,
-                                        col: self.col,
+                                        col: self.col-1,
                                     });
                                     self.state = State::Start;
                                     return ptr_index;
@@ -812,7 +812,7 @@ impl Lexer {
                                     self.tokens.push(Token::Operators(Operator::Subtract));
                                     self.tokens_location.push(TokenLocation {
                                         row: self.row,
-                                        col: self.col,
+                                        col: self.col-1,
                                     });
                                     self.state = State::Start;
                                     return ptr_index;
