@@ -226,7 +226,7 @@ pub mod lexer {
             }
         }
 
-        pub(crate) fn lex(&mut self) -> io::Result<(Vec<Token>, Vec<TokenLocation>, Vec<String>)> {
+        pub fn lex(&mut self) -> io::Result<(Vec<Token>, Vec<TokenLocation>, Vec<String>)> {
             // let mut next_index = 0;
             while self.index < self.chars_len {
                 self.index = self.process_char(self.index);
