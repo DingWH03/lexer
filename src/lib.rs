@@ -120,6 +120,7 @@ pub mod lexer {
         Operators(Operator),
         Delimiters(Delimiter),
         Strings(String),
+        EOF
     }
 
     #[derive(Debug, Clone)]
@@ -231,6 +232,8 @@ pub mod lexer {
             while self.index < self.chars_len {
                 self.index = self.process_char(self.index);
             }
+            self.tokens.push(Token::EOF);
+            self.tokens_location.push(TokenLocation {row: self.row, col: self.col});
             Ok((
                 self.tokens.clone(),
                 self.tokens_location.clone(),
