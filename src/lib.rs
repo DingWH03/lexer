@@ -2,7 +2,7 @@
 pub mod lexer {
     use std::io::{self};
     // 定义关键字枚举类型
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Keyword {
         Auto,
         Break,
@@ -38,7 +38,7 @@ pub mod lexer {
         While,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Operator {
         // Arithmetic Operators
         Add,      // +
@@ -90,7 +90,7 @@ pub mod lexer {
         PointerMemberAccess, // 表示使用 '->' 进行指针结构体成员访问
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Delimiter {
         //界符
         Semicolon,            // ;
@@ -106,13 +106,13 @@ pub mod lexer {
         ConditionalSeparator, // :
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Number {
         Integer(i64), // 整数类型，使用 i64 表示
         Float(f64),   // 浮点数类型，使用 f64 表示
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Token {
         Keywords(Keyword),
         Identifiers(String),
