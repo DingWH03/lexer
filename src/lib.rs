@@ -36,6 +36,8 @@ pub mod lexer {
         Void,
         Volatile,
         While,
+        True,
+        False,
     }
 
     #[derive(Debug, Clone, PartialEq)]
